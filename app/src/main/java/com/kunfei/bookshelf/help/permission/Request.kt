@@ -1,11 +1,11 @@
 package com.kunfei.bookshelf.help.permission
 
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.kunfei.bookshelf.R
@@ -30,7 +30,7 @@ internal class Request : OnRequestPermissionsResultCallback {
             return getDeniedPermissions(this.permissions?.toTypedArray())
         }
 
-    constructor(activity: AppCompatActivity) {
+    constructor(activity: Activity) {
         source = ActivitySource(activity)
         permissions = ArrayList()
         requestTime = System.currentTimeMillis()
@@ -127,19 +127,21 @@ internal class Request : OnRequestPermissionsResultCallback {
     private fun showSettingDialog(rationale: CharSequence, cancel: () -> Unit) {
         rationaleDialog?.dismiss()
         source?.context?.let {
-            rationaleDialog = AlertDialog.Builder(it)
-                    .setTitle(R.string.dialog_title)
-                    .setMessage(rationale)
-                    .setPositiveButton(R.string.dialog_setting) { _, _ ->
-                        it.startActivity<PermissionActivity>(
-                                Pair(
-                                        PermissionActivity.KEY_INPUT_REQUEST_TYPE,
-                                        TYPE_REQUEST_SETTING
-                                )
-                        )
-                    }
-                    .setNegativeButton(R.string.dialog_cancel) { _, _ -> cancel() }
-                    .show()
+            runCatching {
+                rationaleDialog = AlertDialog.Builder(it)
+                        .setTitle(R.string.dialog_title)
+                        .setMessage(rationale)
+                        .setPositiveButton(R.string.dialog_setting) { _, _ ->
+                            it.startActivity<PermissionActivity>(
+                                    Pair(
+                                            PermissionActivity.KEY_INPUT_REQUEST_TYPE,
+                                            TYPE_REQUEST_SETTING
+                                    )
+                            )
+                        }
+                        .setNegativeButton(R.string.dialog_cancel) { _, _ -> cancel() }
+                        .show()
+            }
         }
     }
 

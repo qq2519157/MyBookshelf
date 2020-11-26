@@ -24,6 +24,7 @@ import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.R;
 import com.kunfei.bookshelf.constant.RxBusTag;
 import com.kunfei.bookshelf.utils.ColorUtil;
+import com.kunfei.bookshelf.utils.SoftInputUtil;
 import com.kunfei.bookshelf.utils.bar.ImmersionBar;
 import com.kunfei.bookshelf.utils.theme.MaterialValueHelper;
 import com.kunfei.bookshelf.utils.theme.ThemeStore;
@@ -181,6 +182,7 @@ public abstract class MBaseActivity<T extends IPresenter> extends BaseActivity<T
     /**
      * 设置屏幕方向
      */
+    @SuppressLint("SourceLockedOrientationActivity")
     public void setOrientation(int screenDirection) {
         switch (screenDirection) {
             case 0:
@@ -260,6 +262,7 @@ public abstract class MBaseActivity<T extends IPresenter> extends BaseActivity<T
 
     @Override
     public void finish() {
+        SoftInputUtil.hideIMM(getCurrentFocus());
         super.finish();
         if (MApplication.isEInkMode) {
             overridePendingTransition(R.anim.anim_none, R.anim.anim_none);

@@ -2,6 +2,7 @@ package com.kunfei.bookshelf.widget.page;
 
 import android.text.Layout;
 import android.text.StaticLayout;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -68,15 +69,26 @@ class ChapterProvider {
             txtChapter.addPage(page);
             return txtChapter;
         }
-        content = contentHelper.replaceContent(pageLoader.book.getBookInfoBean().getName(), pageLoader.book.getTag(), content);
+        Log.i("content-1",chapter.getDurChapterName()+"\n"+content.substring(content.length()/3*2));
+        content = contentHelper.replaceContent(pageLoader.book.getBookInfoBean().getName(), pageLoader.book.getTag(), content, pageLoader.book.getReplaceEnable());
+
+//        Log.i("chapterName",chapter.getDurChapterName());
+//      方便debug
+//        if(chapter.getDurChapterName().matches(".*幽魂.*"))
+        {
+//               Log.i("content",content);
+
+        content = contentHelper.LightNovelParagraph2(content,chapter.getDurChapterName());
+        }
         String[] allLine = content.split("\n");
         List<String> lines = new ArrayList<>();
+        List<TxtLine> txtLists = new ArrayList<>();//记录每个字的位置 //pzl
         int rHeight = pageLoader.mVisibleHeight - pageLoader.contentMarginHeight * 2;
         int titleLinesCount = 0;
         boolean showTitle = pageLoader.readBookControl.getShowTitle(); // 是否展示标题
         String paragraph = null;
         if (showTitle) {
-            paragraph = contentHelper.replaceContent(pageLoader.book.getBookInfoBean().getName(), pageLoader.book.getTag(), chapter.getDurChapterName());
+            paragraph = contentHelper.replaceContent(pageLoader.book.getBookInfoBean().getName(), pageLoader.book.getTag(), chapter.getDurChapterName(), pageLoader.book.getReplaceEnable());
             paragraph = paragraph.trim() + "\n";
         }
         int i = 1;
@@ -104,11 +116,13 @@ class ChapterProvider {
                     TxtPage page = new TxtPage(txtChapter.getTxtPageList().size());
                     page.setTitle(chapter.getDurChapterName());
                     page.addLines(lines);
+                    page.setTxtLists(new ArrayList<>(txtLists));
                     page.setTitleLines(titleLinesCount);
                     txtChapter.addPage(page);
                     addTxtPageLength(txtChapter, page.getContent().length());
                     // 重置Lines
                     lines.clear();
+                    txtLists.clear();//pzl
                     rHeight = pageLoader.mVisibleHeight - pageLoader.contentMarginHeight * 2;
                     titleLinesCount = 0;
 
@@ -128,6 +142,25 @@ class ChapterProvider {
                 if (!subStr.equals("\n")) {
                     //将一行字节，存储到lines中
                     lines.add(subStr);
+                    //begin pzl
+                    //记录每个字的位置
+                    char[] cs = subStr.toCharArray();
+                    TxtLine txtList = new TxtLine();//每一行
+                    txtList.setCharsData(new ArrayList<TxtChar>());
+                    for (char c : cs) {
+                        String mesasrustr = String.valueOf(c);
+                        float charwidth = pageLoader.mTextPaint.measureText(mesasrustr);
+                        if (showTitle) {
+                            charwidth = pageLoader.mTitlePaint.measureText(mesasrustr);
+                        }
+                        TxtChar txtChar = new TxtChar();
+                        txtChar.setChardata(c);
+                        txtChar.setCharWidth(charwidth);//字宽
+                        txtChar.setIndex(66);//每页每个字的位置
+                        txtList.getCharsData().add(txtChar);
+                    }
+                    txtLists.add(txtList);
+                    //end pzl
                     //设置段落间距
                     if (showTitle) {
                         titleLinesCount += 1;
@@ -156,11 +189,13 @@ class ChapterProvider {
             TxtPage page = new TxtPage(txtChapter.getTxtPageList().size());
             page.setTitle(chapter.getDurChapterName());
             page.addLines(lines);
+            page.setTxtLists(new ArrayList<>(txtLists));
             page.setTitleLines(titleLinesCount);
             txtChapter.addPage(page);
             addTxtPageLength(txtChapter, page.getContent().length());
             //重置Lines
             lines.clear();
+            txtLists.clear();
         }
         if (txtChapter.getPageSize() > 0) {
             txtChapter.setStatus(TxtChapter.Status.FINISH);

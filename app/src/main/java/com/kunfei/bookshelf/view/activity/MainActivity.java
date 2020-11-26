@@ -45,13 +45,14 @@ import com.kunfei.bookshelf.help.FileHelp;
 import com.kunfei.bookshelf.help.ProcessTextHelp;
 import com.kunfei.bookshelf.help.permission.Permissions;
 import com.kunfei.bookshelf.help.permission.PermissionsCompat;
+import com.kunfei.bookshelf.help.storage.BackupRestoreUi;
 import com.kunfei.bookshelf.model.UpLastChapterModel;
+import com.kunfei.bookshelf.presenter.BookSourcePresenter;
 import com.kunfei.bookshelf.presenter.MainPresenter;
 import com.kunfei.bookshelf.presenter.contract.MainContract;
 import com.kunfei.bookshelf.service.WebService;
 import com.kunfei.bookshelf.utils.ACache;
 import com.kunfei.bookshelf.utils.StringUtils;
-import com.kunfei.bookshelf.utils.theme.ATH;
 import com.kunfei.bookshelf.utils.theme.NavigationViewUtil;
 import com.kunfei.bookshelf.utils.theme.ThemeStore;
 import com.kunfei.bookshelf.view.fragment.BookListFragment;
@@ -69,12 +70,11 @@ import kotlin.Unit;
 
 import static com.kunfei.bookshelf.utils.NetworkUtils.isNetWorkAvailable;
 
-public class MainActivity extends BaseTabActivity<MainContract.Presenter> implements MainContract.View, BookListFragment.CallbackValue {
-    private static final int BACKUP_RESULT = 11;
-    private static final int RESTORE_RESULT = 12;
-    private static final int FILE_SELECT_RESULT = 13;
+public class MainActivity extends BaseTabActivity<MainContract.Presenter> implements MainContract.View,
+        BookListFragment.CallbackValue {
     private final int requestSource = 14;
     private String[] mTitles;
+    private final int REQUEST_QR = 202;
 
     @BindView(R.id.drawer)
     DrawerLayout drawer;
@@ -89,7 +89,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     private AppCompatImageView vwNightTheme;
     private int group;
-    private boolean viewIsList;
     private ActionBarDrawerToggle mDrawerToggle;
     private MoDialogHUD moDialogHUD;
     private long exitTime = 0;
@@ -128,14 +127,21 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
         super.onResume();
 
         String shared_url = preferences.getString("shared_url", "");
-        assert shared_url != null;
         if (shared_url.length() > 1) {
             InputDialog.builder(this)
                     .setTitle(getString(R.string.add_book_url))
                     .setDefaultValue(shared_url)
-                    .setCallback(inputText -> {
-                        inputText = StringUtils.trim(inputText);
-                        mPresenter.addBookUrl(inputText);
+                    .setCallback(new InputDialog.Callback() {
+                        @Override
+                        public void setInputText(String inputText) {
+                            inputText = StringUtils.trim(inputText);
+                            mPresenter.addBookUrl(inputText);
+                        }
+
+                        @Override
+                        public void delete(String value) {
+
+                        }
                     }).show();
             preferences.edit()
                     .putString("shared_url", "")
@@ -154,7 +160,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     @Override
     protected void initData() {
-        viewIsList = preferences.getBoolean("bookshelfIsList", true);
         mTitles = new String[]{getString(R.string.bookshelf), getString(R.string.find)};
     }
 
@@ -398,12 +403,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
-        MenuItem pauseMenu = menu.findItem(R.id.action_list_grid);
-        if (viewIsList) {
-            pauseMenu.setTitle(R.string.action_grid);
-        } else {
-            pauseMenu.setTitle(R.string.action_list);
-        }
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -419,7 +418,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        SharedPreferences.Editor editor = preferences.edit();
         int id = item.getItemId();
         switch (id) {
             case R.id.action_add_local:
@@ -435,20 +433,33 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
             case R.id.action_add_url:
                 InputDialog.builder(this)
                         .setTitle(getString(R.string.add_book_url))
-                        .setCallback(inputText -> {
-                            inputText = StringUtils.trim(inputText);
-                            mPresenter.addBookUrl(inputText);
+                        .setCallback(new InputDialog.Callback() {
+                            @Override
+                            public void setInputText(String inputText) {
+                                inputText = StringUtils.trim(inputText);
+                                mPresenter.addBookUrl(inputText);
+                            }
+
+                            @Override
+                            public void delete(String value) {
+
+                            }
                         }).show();
                 break;
-            case R.id.action_download_all:
-                if (!isNetWorkAvailable())
-                    toast(R.string.network_connection_unavailable);
-                else
-                    RxBus.get().post(RxBusTag.DOWNLOAD_ALL, 10000);
+            case R.id.action_add_qrcode:
+
+                Intent intent = new Intent(this, QRCodeScanActivity.class);
+                startActivityForResult(intent, REQUEST_QR);
                 break;
-            case R.id.action_list_grid:
-                editor.putBoolean("bookshelfIsList", !viewIsList).apply();
-                recreate();
+            case R.id.action_download_all:
+                if (!isNetWorkAvailable()) {
+                    toast(R.string.network_connection_unavailable);
+                } else {
+                    RxBus.get().post(RxBusTag.DOWNLOAD_ALL, 10000);
+                }
+                break;
+            case R.id.menu_bookshelf_layout:
+                selectBookshelfLayout();
                 break;
             case R.id.action_arrange_bookshelf:
                 if (getBookListFragment() != null) {
@@ -456,11 +467,13 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
                 }
                 break;
             case R.id.action_web_start:
-                WebService.startThis(this);
+                boolean startedThisTime = WebService.startThis(this);
+                if (!startedThisTime) {
+                    toast(getString(R.string.web_service_already_started_hint));
+                }
                 break;
             case android.R.id.home:
-                if (drawer.isDrawerOpen(GravityCompat.START)
-                ) {
+                if (drawer.isDrawerOpen(GravityCompat.START)) {
                     drawer.closeDrawers();
                 } else {
                     drawer.openDrawer(GravityCompat.START, !MApplication.isEInkMode);
@@ -513,7 +526,6 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
      */
     private void setUpNavigationView() {
         navigationView.setBackgroundColor(ThemeStore.backgroundColor(this));
-        NavigationViewUtil.setItemTextColors(navigationView, getResources().getColor(R.color.tv_text_default), ThemeStore.accentColor(this));
         NavigationViewUtil.setItemIconColors(navigationView, getResources().getColor(R.color.tv_text_default), ThemeStore.accentColor(this));
         NavigationViewUtil.disableScrollbar(navigationView);
         @SuppressLint("InflateParams") View headerView = LayoutInflater.from(this).inflate(R.layout.navigation_header, null);
@@ -546,10 +558,10 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
                     handler.postDelayed(() -> DonateActivity.startThis(this), 200);
                     break;
                 case R.id.action_backup:
-                    handler.postDelayed(this::backup, 200);
+                    handler.postDelayed(() -> BackupRestoreUi.INSTANCE.backup(this), 200);
                     break;
                 case R.id.action_restore:
-                    handler.postDelayed(this::restore, 200);
+                    handler.postDelayed(() -> BackupRestoreUi.INSTANCE.restore(this), 200);
                     break;
                 case R.id.action_theme:
                     handler.postDelayed(() -> ThemeSettingActivity.startThis(this), 200);
@@ -573,42 +585,13 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
         vwNightTheme.getDrawable().mutate().setColorFilter(ThemeStore.accentColor(this), PorterDuff.Mode.SRC_ATOP);
     }
 
-    /**
-     * 备份
-     */
-    private void backup() {
-        new PermissionsCompat.Builder(this)
-                .addPermissions(Permissions.READ_EXTERNAL_STORAGE, Permissions.WRITE_EXTERNAL_STORAGE)
-                .rationale(R.string.backup_permission)
-                .onGranted((requestCode) -> {
-                    AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this)
-                            .setTitle(R.string.backup_confirmation)
-                            .setMessage(R.string.backup_message)
-                            .setPositiveButton(R.string.ok, (dialog, which) -> mPresenter.backupData())
-                            .setNegativeButton(R.string.cancel, null)
-                            .show();
-                    ATH.setAlertDialogTint(alertDialog);
-                    return Unit.INSTANCE;
-                }).request();
-    }
-
-    /**
-     * 恢复
-     */
-    private void restore() {
-        new PermissionsCompat.Builder(this)
-                .addPermissions(Permissions.READ_EXTERNAL_STORAGE, Permissions.WRITE_EXTERNAL_STORAGE)
-                .rationale(R.string.restore_permission)
-                .onGranted((requestCode) -> {
-                    AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this)
-                            .setTitle(R.string.restore_confirmation)
-                            .setMessage(R.string.restore_message)
-                            .setPositiveButton(R.string.ok, (dialog, which) -> mPresenter.restoreData())
-                            .setNegativeButton(R.string.cancel, null)
-                            .show();
-                    ATH.setAlertDialogTint(alertDialog);
-                    return Unit.INSTANCE;
-                }).request();
+    private void selectBookshelfLayout() {
+        new AlertDialog.Builder(this)
+                .setTitle("选择书架布局")
+                .setItems(R.array.bookshelf_layout, (dialog, which) -> {
+                    preferences.edit().putInt("bookshelfLayout", which).apply();
+                    recreate();
+                }).show();
     }
 
     /**
@@ -702,13 +685,32 @@ public class MainActivity extends BaseTabActivity<MainContract.Presenter> implem
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK) {
-            if (requestCode == requestSource) {
-                FindBookFragment findBookFragment = getFindFragment();
-                if (findBookFragment != null) {
-                    findBookFragment.refreshData();
+        BackupRestoreUi.INSTANCE.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode) {
+            case requestSource:
+                if (resultCode == RESULT_OK) {
+                    FindBookFragment findBookFragment = getFindFragment();
+                    if (findBookFragment != null) {
+                        findBookFragment.refreshData();
+                    }
                 }
-            }
+                break;
+            case REQUEST_QR:
+                if (resultCode == RESULT_OK) {
+                    String result = data.getStringExtra("result");
+                    if (!StringUtils.isTrimEmpty(result)) {
+                        result=result.trim();
+                        // 如果只有书源,则导入书源
+                        if(result.replaceAll("(\\s|\n)*","").matches("^\\{.*$")) {
+                            new BookSourcePresenter().importBookSource(result);
+                            break;
+                        }
+//                        String[] string=result.split("#",2);
+//                        mPresenter.addBookUrl(string[0]);
+                        mPresenter.addBookUrl(result);
+                    }
+                }
+                break;
         }
     }
 

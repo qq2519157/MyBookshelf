@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import androidx.annotation.Keep;
 
 import com.google.gson.Gson;
+import com.kunfei.bookshelf.help.JsExtensions;
 import com.kunfei.bookshelf.utils.NetworkUtils;
 import com.kunfei.bookshelf.utils.StringUtils;
 import com.kunfei.bookshelf.utils.UrlEncoderUtils;
@@ -33,7 +34,7 @@ import static com.kunfei.bookshelf.utils.NetworkUtils.headerPattern;
  * 搜索URL规则解析
  */
 @Keep
-public class AnalyzeUrl {
+public class AnalyzeUrl implements JsExtensions {
     private static final Pattern pagePattern = Pattern.compile("\\{(.*?)\\}");
     private String baseUrl;
     private String url;
@@ -58,19 +59,23 @@ public class AnalyzeUrl {
         if (!TextUtils.isEmpty(baseUrl)) {
             this.baseUrl = headerPattern.matcher(baseUrl).replaceAll("");
         }
-        //解析Header
-        ruleUrl = analyzeHeader(ruleUrl, headerMapF);
         //替换关键字
         if (!StringUtils.isTrimEmpty(key)) {
-            ruleUrl = ruleUrl.replace("searchKey", key);
+            // 处理searchKey=searchKey的情况
+            if (ruleUrl.matches("=[\\s{(]*searchKey"))
+                ruleUrl = ruleUrl.replaceFirst("=[\\s{(]*searchKey", "=" + key);
+            else
+                ruleUrl = ruleUrl.replace("searchKey", key);
         }
-        //分离编码规则
-        ruleUrl = splitCharCode(ruleUrl);
         //判断是否有下一页
         if (page != null && page > 1 && !ruleUrl.contains("searchPage"))
             throw new Exception("没有下一页");
         //替换js
         ruleUrl = replaceJs(ruleUrl, baseUrl, page, key);
+        //解析Header
+        ruleUrl = analyzeHeader(ruleUrl, headerMapF);
+        //分离编码规则
+        ruleUrl = splitCharCode(ruleUrl);
         //设置页数
         ruleUrl = analyzePage(ruleUrl, page);
         //执行规则列表
@@ -78,6 +83,9 @@ public class AnalyzeUrl {
         for (String rule : ruleList) {
             if (rule.startsWith("<js>")) {
                 rule = rule.substring(4, rule.lastIndexOf("<"));
+                ruleUrl = (String) evalJS(rule, ruleUrl);
+            } else if (rule.startsWith("@js:")) {
+                rule = rule.substring(4);
                 ruleUrl = (String) evalJS(rule, ruleUrl);
             } else {
                 ruleUrl = rule.replace("@result", ruleUrl);
@@ -255,6 +263,10 @@ public class AnalyzeUrl {
         SimpleBindings bindings = new SimpleBindings();
         bindings.put("result", result);
         return SCRIPT_ENGINE.eval(jsStr, bindings);
+    }
+
+    public String getCharCode() {
+        return charCode;
     }
 
     public String getHost() {

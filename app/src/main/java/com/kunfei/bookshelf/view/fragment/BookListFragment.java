@@ -110,11 +110,12 @@ public class BookListFragment extends MBaseFragment<BookListContract.Presenter> 
     protected void bindView() {
         super.bindView();
         unbinder = ButterKnife.bind(this, view);
-        if (preferences.getBoolean("bookshelfIsList", true)) {
+        int bookshelfLayout = preferences.getInt("bookshelfLayout", 0);
+        if (bookshelfLayout == 0) {
             rvBookshelf.setLayoutManager(new LinearLayoutManager(getContext()));
             bookShelfAdapter = new BookShelfListAdapter(getActivity());
         } else {
-            rvBookshelf.setLayoutManager(new GridLayoutManager(getContext(), 3));
+            rvBookshelf.setLayoutManager(new GridLayoutManager(getContext(), bookshelfLayout + 2));
             bookShelfAdapter = new BookShelfGridAdapter(getActivity());
         }
         rvBookshelf.setAdapter((RecyclerView.Adapter) bookShelfAdapter);
@@ -158,7 +159,7 @@ public class BookListFragment extends MBaseFragment<BookListContract.Presenter> 
         ivBack.setOnClickListener(v -> setArrange(false));
         ivDel.setOnClickListener(v -> {
             if (bookShelfAdapter.getSelected().size() == bookShelfAdapter.getBooks().size()) {
-                AlertDialog alertDialog = new AlertDialog.Builder(getActivity())
+                AlertDialog alertDialog = new AlertDialog.Builder(requireContext())
                         .setTitle(R.string.delete)
                         .setMessage(getString(R.string.sure_del_all_book))
                         .setPositiveButton(R.string.yes, (dialog, which) -> delSelect())

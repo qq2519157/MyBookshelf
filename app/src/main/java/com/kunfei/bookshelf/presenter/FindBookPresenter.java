@@ -12,6 +12,7 @@ import com.kunfei.bookshelf.MApplication;
 import com.kunfei.bookshelf.bean.BookSourceBean;
 import com.kunfei.bookshelf.bean.FindKindBean;
 import com.kunfei.bookshelf.bean.FindKindGroupBean;
+import com.kunfei.bookshelf.help.JsExtensions;
 import com.kunfei.bookshelf.model.BookSourceManager;
 import com.kunfei.bookshelf.model.analyzeRule.AnalyzeRule;
 import com.kunfei.bookshelf.presenter.contract.FindBookContract;
@@ -31,9 +32,10 @@ import io.reactivex.disposables.Disposable;
 
 import static com.kunfei.bookshelf.constant.AppConstant.SCRIPT_ENGINE;
 
-public class FindBookPresenter extends BasePresenterImpl<FindBookContract.View> implements FindBookContract.Presenter {
+public class FindBookPresenter extends BasePresenterImpl<FindBookContract.View> implements FindBookContract.Presenter, JsExtensions {
     private Disposable disposable;
     private AnalyzeRule analyzeRule;
+    private String findError = "发现规则语法错误";
 
     @SuppressWarnings("unchecked")
     @Override
@@ -48,7 +50,7 @@ public class FindBookPresenter extends BasePresenterImpl<FindBookContract.View> 
                 try {
                     String[] kindA;
                     String findRule;
-                    if (!TextUtils.isEmpty(sourceBean.getRuleFindUrl())) {
+                    if (!TextUtils.isEmpty(sourceBean.getRuleFindUrl()) && !sourceBean.containsGroup(findError)) {
                         boolean isJsAndCache = sourceBean.getRuleFindUrl().startsWith("<js>");
                         if (isJsAndCache) {
                             findRule = aCache.getAsString(sourceBean.getBookSourceUrl());
@@ -82,7 +84,7 @@ public class FindBookPresenter extends BasePresenterImpl<FindBookContract.View> 
                         }
                     }
                 } catch (Exception exception) {
-                    sourceBean.addGroup("发现规则语法错误");
+                    sourceBean.addGroup(findError);
                     BookSourceManager.addBookSource(sourceBean);
                 }
             }

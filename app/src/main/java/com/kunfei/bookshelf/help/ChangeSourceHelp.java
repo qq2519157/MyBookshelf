@@ -111,6 +111,8 @@ public class ChangeSourceHelp {
         bookShelfBean.setDurChapterName(oldBook.getDurChapterName());
         bookShelfBean.setDurChapter(oldBook.getDurChapter());
         bookShelfBean.setDurChapterPage(oldBook.getDurChapterPage());
+        bookShelfBean.setReplaceEnable(oldBook.getReplaceEnable());
+        bookShelfBean.setAllowUpdate(oldBook.getAllowUpdate());
         return WebBookModel.getInstance().getBookInfo(bookShelfBean)
                 .flatMap(book -> WebBookModel.getInstance().getChapterList(book))
                 .flatMap(chapterBeanList -> saveChangedBook(bookShelfBean, oldBook, chapterBeanList))
@@ -126,6 +128,8 @@ public class ChangeSourceHelp {
             newBook.setDurChapter(BookshelfHelp.getDurChapter(oldBook.getDurChapter(), oldBook.getChapterListSize(), oldBook.getDurChapterName(), chapterBeanList));
             newBook.setDurChapterName(chapterBeanList.get(newBook.getDurChapter()).getDurChapterName());
             newBook.setGroup(oldBook.getGroup());
+            newBook.getBookInfoBean().setName(oldBook.getBookInfoBean().getName());
+            newBook.getBookInfoBean().setAuthor(oldBook.getBookInfoBean().getAuthor());
             BookshelfHelp.removeFromBookShelf(oldBook);
             BookshelfHelp.saveBookToShelf(newBook);
             DbHelper.getDaoSession().getBookChapterBeanDao().insertOrReplaceInTx(chapterBeanList);
